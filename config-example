@@ -4,3 +4,4 @@ server=irc.subluminal.net
 port=6667
 channel=#test
 init=PRIVMSG NickServ identify your_nickserv_passwd
+db=db

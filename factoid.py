@@ -1,53 +1,44 @@
 import os
 import random
+import sqlite3
 
 class Factoid:
     def __init__(self, ircsend, config):
         self.ircsend = ircsend
+        self.dbfile = config['db']
 
         try:
-            self.prefix = config["factoid prefix"]
+            self.prefix = config['factoid prefix']
         except KeyError:
-            self.prefix = "!"
+            self.prefix = '!'
 
     def get_factoid_def(self, key):
-        key = key.lower()
-        # first look through the factoids file
-        # this line commented out because we like relative paths
-        #with open(os.path.join(os.path.dirname(__file__), "resources", "factoids.txt")) as f:
-        with open(os.path.join("resources", "factoids.txt")) as f:
-            on_key = False
-            found = False
-            for l in f:
-                on_key = not on_key
-
-                if on_key:
-                    if key.lower() in l[:-1].lower().split(" "):
-                        found = True
-                elif found:
-                    return l[:-1]
-        try:
-            #with open(os.path.join(os.path.dirname(__file__), "resources", "randomfactoids", key+".qt")) as f:
-            with open(os.path.join("resources", "randomfactoids", key+".qt")) as f:
-                # use reservoir sampling algorithm to pick a random line from the qt file
-                selection = None
-                for i, l in enumerate(f):
-                    if not random.randrange(i+1):
-                        selection = l[:-1]
-                return selection
-        except FileNotFoundError:
-            print("file not found")
-        return None
-
+        with sqlite3.connect(self.dbfile) as conn:
+            c = conn.execute('select def from names, definitions where name=? and names.factgroup=definitions.factgroup order by random() limit 1', (key,))
+            result = c.fetchone()
+            if result:
+                return result[0]
+            else:
+                return None
+    
     def ircget(self, msg):
         smsg = msg.split(" ")
         try:
-            if smsg[1] == "PRIVMSG":
+            if smsg[1] == 'PRIVMSG':
                 stxt = smsg[3][1:].partition(self.prefix)
                 if not stxt[0]:
-                    fact = self.get_factoid_def(stxt[2])
+                    if stxt[2] == 'give':
+                        output = smsg[4] + ': '
+                        fact = self.get_factoid_def(smsg[5])
+                    else:
+                        output = ''
+                        fact = self.get_factoid_def(stxt[2])
                     if fact:
-                        self.ircsend("PRIVMSG {} :{}".format(smsg[2], fact))
+                        if smsg[2].startswith('#'):
+                            self.ircsend('PRIVMSG {} :{}'.format(smsg[2], output + fact))
+                        else:
+                            sender = smsg[0][1:].partition('!')[0]
+                            self.ircsend('PRIVMSG {} :{}'.format(sender, output + fact))
 
         except IndexError:
             pass
