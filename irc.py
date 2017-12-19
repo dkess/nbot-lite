@@ -3,6 +3,7 @@
 import socket
 
 import channeljoin
+import choose
 import factoid
 
 config = {'init':[]}
@@ -34,6 +35,7 @@ ircsend('USER %s 0 * :%s\r\nNICK %s\r\n' %
 plugins = []
 plugins.append(channeljoin.ChannelJoin(ircsend, config))
 plugins.append(factoid.Factoid(ircsend, config))
+plugins.append(choose.Choose(ircsend, config))
 
 while (1):
     data = sock.recv(512)
